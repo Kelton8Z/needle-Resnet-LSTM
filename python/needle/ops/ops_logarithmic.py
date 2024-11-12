@@ -10,19 +10,19 @@ from ..backend_selection import array_api, BACKEND
 class LogSoftmax(TensorOp):
     def compute(self, Z):
         ### BEGIN YOUR SOLUTION
-        max_z = array_api.max(Z, axis=-1, keepdims=True) 
+        max_z = Z.max(axis=-1, keepdims=True) 
         exp_Z = array_api.exp(Z - max_z)
-        return Z - max_z - array_api.log(array_api.sum(exp_Z, axis=-1, keepdims=True)) 
+        return Z - max_z - array_api.log(exp_Z.sum(axis=-1, keepdims=True)) 
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         Z = node.inputs[0].realize_cached_data()
-        max_z = array_api.max(Z, axis=-1, keepdims=True)
+        max_z = Z.max(axis=-1, keepdims=True)
         exp_Z = array_api.exp(Z - max_z)
-        softmax_Z = exp_Z / array_api.sum(exp_Z, axis=-1, keepdims=True)
+        softmax_Z = exp_Z / exp_Z.sum(axis=-1, keepdims=True)
         
-        return out_grad - array_api.sum(out_grad.numpy(), axis=-1, keepdims=True) * softmax_Z
+        return out_grad - out_grad.numpy().sum(axis=-1, keepdims=True) * softmax_Z
         ### END YOUR SOLUTION
 
 
@@ -36,9 +36,11 @@ class LogSumExp(TensorOp):
 
     def compute(self, Z):
         ### BEGIN YOUR SOLUTION
-        max_z_original = array_api.max(Z, self.axes, keepdims=True) 
-        max_z_reduce = array_api.max(Z, self.axes)
-        return array_api.log(array_api.sum(array_api.exp(Z - max_z_original), self.axes)) + max_z_reduce 
+        max_z_original = Z.max(self.axes, keepdims=True) 
+        max_z_reduce = Z.max(self.axes)
+        diff = Z - max_z_original.broadcast_to(Z.shape)
+        log_sum = array_api.log(array_api.summation(array_api.exp(diff), axis=self.axes))
+        return log_sum + max_z_reduce 
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):

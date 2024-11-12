@@ -43,7 +43,39 @@ void Fill(AlignedArray* out, scalar_t val) {
   }
 }
 
+enum strided_index_mode {SETITEM, COMPACT, SETVAL};
 
+void _strided_index_setter(const AlignedArray* a, AlignedArray* out, std::vector<int32_t> shape,
+                    std::vector<int32_t> strides, size_t offset, strided_index_mode mode, int val=-1) {
+  int dims = shape.size();
+  std::vector<int32_t> loop(dims, 0);
+  int cnt = 0;
+  while (true) {
+    int index = offset;
+    for (int i = 0; i < dims; i++) {
+      index += strides[i] * loop[i];
+    }
+    switch (mode) {
+      case SETITEM: out->ptr[index] = a->ptr[cnt++]; break;
+      case COMPACT: out->ptr[cnt++] = a->ptr[index]; break;
+      case SETVAL: out->ptr[index] = val; break;
+    }
+
+    // advance in rightmost dimension
+    loop[dims - 1]++;
+
+    // carry
+    int idx = dims - 1;
+    while (loop[idx] == shape[idx]) { // move to next left dimension if current one done
+      if (idx == 0) {
+        // checked all dimensions
+        return;
+      }
+      loop[idx--] = 0;
+      loop[idx]++;
+    }
+  }
+}
 
 void Compact(const AlignedArray& a, AlignedArray* out, std::vector<int32_t> shape,
              std::vector<int32_t> strides, size_t offset) {
@@ -62,7 +94,7 @@ void Compact(const AlignedArray& a, AlignedArray* out, std::vector<int32_t> shap
    *  function will implement here, so we won't repeat this note.)
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  _strided_index_setter(&a, out, shape, strides, offset, COMPACT); 
   /// END SOLUTION
 }
 
@@ -79,7 +111,7 @@ void EwiseSetitem(const AlignedArray& a, AlignedArray* out, std::vector<int32_t>
    *   offset: offset of the *out* array (not a, which has zero offset, being compact)
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+    _strided_index_setter(&a, out, shape, strides, offset, SETITEM); 
   /// END SOLUTION
 }
 
@@ -100,7 +132,7 @@ void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vect
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  _strided_index_setter(nullptr, out, shape, strides, offset, SETVAL, val); 
   /// END SOLUTION
 }
 
@@ -252,7 +284,24 @@ void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uin
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  // Initialize output matrix to zeros
+    for (uint32_t i = 0; i < m * p; i++) {
+        out->ptr[i] = 0;
+    }
+
+    // Perform matrix multiplication using three nested loops
+    for (uint32_t i = 0; i < m; i++) {         // Iterate over rows of a
+        for (uint32_t j = 0; j < p; j++) {     // Iterate over columns of b
+            for (uint32_t k = 0; k < n; k++) { // Iterate over columns of a / rows of b
+                // Computing the dot product of row i of a and column j of b
+                // For compact storage:
+                // a[i][k] = a[i * n + k]
+                // b[k][j] = b[k * p + j]
+                // out[i][j] = out[i * p + j]
+                out->ptr[i * p + j] += a.ptr[i * n + k] * b.ptr[k * p + j];
+            }
+        }
+    }
   /// END SOLUTION
 }
 
@@ -282,7 +331,7 @@ inline void AlignedDot(const float* __restrict__ a,
   out = (float*)__builtin_assume_aligned(out, TILE * ELEM_SIZE);
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+
   /// END SOLUTION
 }
 
@@ -308,7 +357,62 @@ void MatmulTiled(const AlignedArray& a, const AlignedArray& b, AlignedArray* out
    *
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  const uint32_t M_tiles = m / TILE;  // Number of tiles in m dimension
+    const uint32_t N_tiles = n / TILE;  // Number of tiles in n dimension
+    const uint32_t P_tiles = p / TILE;  // Number of tiles in p dimension
+    
+    // Initialize output array to zeros
+    std::fill(out->ptr, out->ptr + out->size, 0.0f);
+    
+    // Iterate over tiles
+    for (uint32_t i = 0; i < M_tiles; i++) {        // Tile row in output
+        for (uint32_t j = 0; j < P_tiles; j++) {    // Tile column in output
+            for (uint32_t k = 0; k < N_tiles; k++) { // Tiles in reduction dimension
+                
+                // For each tile multiplication, we need to:
+                // 1. Compute base indices for the tiles
+                // 2. Perform TILE x TILE dot products
+                
+                for (uint32_t ti = 0; ti < TILE; ti++) {        // Row within output tile
+                    for (uint32_t tj = 0; tj < TILE; tj++) {    // Column within output tile
+                        // This will accumulate dot product for position (ti,tj) in output tile
+                        
+                        // Compute offsets for the dot products
+                        const size_t a_tile_offset = i * N_tiles * TILE * TILE + k * TILE * TILE;
+                        const size_t b_tile_offset = k * P_tiles * TILE * TILE + j * TILE * TILE;
+                        const size_t out_tile_offset = i * P_tiles * TILE * TILE + j * TILE * TILE;
+                        
+                        // Extract row from a and column from b for dot product
+                        scalar_t* temp_a = new scalar_t[TILE];
+                        scalar_t* temp_b = new scalar_t[TILE];
+                        
+                        // Get row from a tile
+                        for (uint32_t tk = 0; tk < TILE; tk++) {
+                            temp_a[tk] = a.ptr[a_tile_offset + ti * TILE + tk];
+                        }
+                        
+                        // Get column from b tile
+                        for (uint32_t tk = 0; tk < TILE; tk++) {
+                            temp_b[tk] = b.ptr[b_tile_offset + tk * TILE + tj];
+                        }
+                        
+                        // Perform dot product and accumulate result
+                        scalar_t dot_result = 0.0f;
+                        for (uint32_t l = 0; l < TILE; l++) {
+                            dot_result += temp_a[l] * temp_b[l];
+                        }
+                        
+                        // Add to output tile
+                        out->ptr[out_tile_offset + ti * TILE + tj] += dot_result;
+                        
+                        // Clean up temporary arrays
+                        delete[] temp_a;
+                        delete[] temp_b;
+                    }
+                }
+            }
+        }
+    }
   /// END SOLUTION
 }
 
@@ -323,7 +427,7 @@ void ReduceMax(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+
   /// END SOLUTION
 }
 
@@ -338,7 +442,13 @@ void ReduceSum(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  for (int i = 0; i < out->size; i++) {
+    scalar_t sum = 0;
+    for (int j = 0; j < reduce_size; j++) {
+      sum += a.ptr[i * reduce_size + j];
+    }
+    out->ptr[i] = sum;
+  }
   /// END SOLUTION
 }
 

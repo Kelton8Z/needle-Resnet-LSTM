@@ -247,7 +247,13 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if prod(new_shape) != prod(self._shape):
+            raise ValueError("Product of current shape is not equal to \
+                              the product of the new shape!")
+        if not self.is_compact():
+            raise ValueError("The matrix is not compact!")
+
+        return NDArray.make(new_shape, NDArray.compact_strides(new_shape), self._device, self._handle)
         ### END YOUR SOLUTION
 
     def permute(self, new_axes):
@@ -272,7 +278,9 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        new_shape = tuple(np.array(self._shape)[list(new_axes)])
+        new_strides = tuple(np.array(self._strides)[list(new_axes)])
+        return NDArray.make(new_shape, new_strides, self._device, self._handle)
         ### END YOUR SOLUTION
 
     def broadcast_to(self, new_shape):
@@ -296,7 +304,14 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        for x, y in zip(self._shape, new_shape):
+            assert(x == y or x == 1)
+        
+        new_strides = list(self._strides)
+        for i in range(len(self._shape)):
+            if self._shape[i] != new_shape[i]:
+                new_strides[i] = 0
+        return NDArray.make(new_shape, tuple(new_strides), self._device, self._handle)
         ### END YOUR SOLUTION
 
     ### Get and set elements
@@ -362,8 +377,36 @@ class NDArray:
         )
         assert len(idxs) == self.ndim, "Need indexes equal to number of dimensions"
 
+        new_shape = [(sl.stop - sl.start + sl.step - 1) // sl.step for sl in idxs]
+        offset = sum([sl.start * st for sl, st in zip(idxs, self._strides)])
+        new_strides = tuple([st * sl.step for st, sl in zip(self._strides, idxs)])
+        return NDArray.make(new_shape, new_strides, self._device, self._handle, offset)
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        new_shape = []
+        new_strides = []
+        offset = 0
+
+        # Process each dimension
+        for i, sl in enumerate(idxs):
+            # Get the start, stop, and step from the slice
+            start = sl.start if sl.start is not None else 0
+            stop = sl.stop if sl.stop is not None else self.shape[i]
+            step = sl.step if sl.step is not None else 1
+            
+            # Calculate size of this dimension in the new array
+            dim_size = (stop - start + step - 1) // step if stop > start else 0
+            new_shape.append(dim_size)
+            
+            # Calculate new stride for this dimension
+            new_strides.append(self.strides[i] * step)
+            
+            # Update offset based on the start index
+            offset += self.strides[i] * start
+
+        # Create new array with calculated shape, strides, and offset
+        new_array = NDArray.make(tuple(new_shape), tuple(new_strides), self._device, self._handle, offset)
+        
+        return new_array
         ### END YOUR SOLUTION
 
     def __setitem__(self, idxs, other):
@@ -627,7 +670,7 @@ def tanh(a):
     return a.tanh()
 
 
-def sum(a, axis=None, keepdims=False):
+def summation(a, axis=None, keepdims=False):
     return a.sum(axis=axis, keepdims=keepdims)
 
 
