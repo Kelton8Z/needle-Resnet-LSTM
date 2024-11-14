@@ -616,7 +616,13 @@ class NDArray:
         Note: compact() before returning.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert len(axes) <= len(self.shape)
+        strides = list(self.strides)
+        for axis in axes:
+            strides[axis] = - strides[axis]
+        strides = tuple(strides)
+        offset = sum([(self.shape[axis] - 1) * self.strides[axis] for axis in axes])
+        return NDArray.make(self.shape, strides, self._device, self._handle, offset).compact()
         ### END YOUR SOLUTION
 
     def pad(self, axes):
@@ -626,7 +632,18 @@ class NDArray:
         axes = ( (0, 0), (1, 1), (0, 0)) pads the middle axis with a 0 on the left and right side.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert len(axes) == len(self.shape)
+        new_shape = []
+        old_slices = []
+        for (l, r), n in zip(axes, self.shape):
+            new_shape.append(l + r + n)
+            old_slices.append(slice(l, l + n))
+
+        new_shape = tuple(new_shape)
+        arr = self.device.full(new_shape, 0)
+        old_slices = tuple(old_slices)
+        arr[old_slices] = self
+        return arr
         ### END YOUR SOLUTION
 
 def array(a, dtype="float32", device=None):
