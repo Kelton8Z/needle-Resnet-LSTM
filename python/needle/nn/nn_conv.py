@@ -5,8 +5,7 @@ from needle.autograd import Tensor
 from needle import ops
 import needle.init as init
 import numpy as np
-from .nn_basic import Parameter, Module
-
+from .nn_basic import Parameter, Module, BatchNorm2d, ReLU
 
 class Conv(Module):
     """
@@ -50,3 +49,16 @@ class Conv(Module):
         out = out.transpose((3, 2)).transpose((2, 1))
         return out
         ### END YOUR SOLUTION
+        
+class ConvBN(Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, device=None):
+        super().__init__()
+        self.conv = Conv(in_channels, out_channels, kernel_size, stride=stride, device=device)
+        self.bn = BatchNorm2d(out_channels, device=device)
+        self.relu = ReLU()
+        
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
