@@ -96,15 +96,7 @@ class Linear(Module):
     def forward(self, X: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         output = X.matmul(self.weight)
-        if self.bias:
-            # bias_shape = output.shape
-            if len(self.bias.shape) > 2:
-                self.bias = Parameter(np.unique(self.bias))
-            #     bias_shape = (1,) * (len(output.shape) - 1) + (self.out_features,)
-            #     self.bias = Tensor(self.bias.data.numpy()[0], requires_grad=True)
-            # need to be broadcastable beyond 2D
-            print(f'broadcasting from {self.bias.shape} to {output.shape}')
-            
+        if self.bias:            
             output += self.bias.broadcast_to(output.shape)
         return output
         ### END YOUR SOLUTION
@@ -113,7 +105,10 @@ class Linear(Module):
 class Flatten(Module):
     def forward(self, X):
         ### BEGIN YOUR SOLUTION
-        return X.reshape((X.shape[0], -1))
+        size = 1
+        for dim in X.shape:
+            size *= dim
+        return X.reshape((X.shape[0], size // X.shape[0]))
         ### END YOUR SOLUTION
 
 
@@ -169,9 +164,16 @@ class BatchNorm1d(Module):
             
         if self.training:
             mean = (x.sum(batch_axis) / num_batches)
+            mean = Tensor(mean.reshape((1, mean.shape[0])))
             var = (((x - mean.broadcast_to(x.shape))**2).sum(batch_axis) / num_batches)
+            var = Tensor(var.reshape((1, var.shape[0])))
             std = (var.broadcast_to(x.shape) + self.eps)**0.5
-            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean.data
+            
+            mean = Tensor(mean.reshape((mean.shape[1], )))
+            var = Tensor(var.reshape((var.shape[1], )))
+            old_mean = (1 - self.momentum) * self.running_mean
+            new_mean = self.momentum * mean.data
+            self.running_mean = old_mean + new_mean
             self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var.data
             if len(mean.shape) == 1:
                 mean = mean.reshape((1, mean.shape[0]))
@@ -182,7 +184,9 @@ class BatchNorm1d(Module):
             # self.running_mean = Tensor(self.running_mean.reshape((self.running_mean.shape[0], 1)))
             norm = (x - self.running_mean.broadcast_to(x.shape)) / (self.running_var.broadcast_to(x.shape) + self.eps)**0.5
 
-        output = self.weight.broadcast_to(x.shape) * norm + self.bias.broadcast_to(x.shape)
+        # print(self.weight.shape, self.bias.shape)
+        x = x.reshape((num_features, num_batches))
+        output = self.weight.broadcast_to(x.shape) * norm.reshape((norm.shape[1], norm.shape[0])) + self.bias.broadcast_to(x.shape)
         return output
         ### END YOUR SOLUTION
 
