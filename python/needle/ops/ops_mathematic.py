@@ -213,7 +213,11 @@ class BroadcastTo(TensorOp):
             if ori == cur:
                 same_dims[i] = -1
 
-        return out_grad.sum(tuple(dim for dim in same_dims if dim >= 0))#.reshape(input_shape)
+        axis = tuple(dim for dim in same_dims if dim >= 0)
+        if axis:
+            return out_grad.sum(axis)
+        else:
+            return out_grad
         ### END YOUR SOLUTION
 
 
