@@ -9,13 +9,14 @@ class Dictionary(object):
     Creates a dictionary from a list of words, mapping each word to a
     unique integer.
     Attributes:
-    word2idx: dictionary mapping from a word to its unique ID
-    idx2word: list of words in the dictionary, in the order they were added
+    word2idx: list of words in the dictionary, in the order they were added
         to the dictionary (i.e. each word only appears once in this list)
+    idx2word: dictionary mapping from unique ID to its word
     """
     def __init__(self):
-        self.word2idx = {}
-        self.idx2word = []
+        self.word2idx = []
+        self.idx2word = {}
+        self.words = set()
 
     def add_word(self, word):
         """
@@ -25,7 +26,14 @@ class Dictionary(object):
         Returns the word's unique ID.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if word not in self.words:
+            self.words.add(word)
+            id = len(self.word2idx)
+            self.idx2word[id] = word
+            self.word2idx.append(word)
+        else:
+            id = self.word2idx.index(word)
+        return id
         ### END YOUR SOLUTION
 
     def __len__(self):
@@ -33,7 +41,7 @@ class Dictionary(object):
         Returns the number of unique words in the dictionary.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.words)
         ### END YOUR SOLUTION
 
 
@@ -60,7 +68,28 @@ class Corpus(object):
         ids: List of ids
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        ids = []
+        
+
+        def tokenize_line(line):
+            words = line.split()
+            for word in words:
+                ids.append(self.dictionary.add_word(word))
+            ids.append(eos_id)
+
+        with open(path, "r") as f:
+            if max_lines:
+                lines = [f.readline() for _ in range(max_lines)]
+            else:
+                lines = f.readlines()
+                
+            words = lines[0].split()
+            for word in words:
+                ids.append(self.dictionary.add_word(word))
+            eos_id = self.dictionary.add_word("<eos>")
+            for line in lines[1:]:
+                tokenize_line(line)
+        return ids
         ### END YOUR SOLUTION
 
 
@@ -81,7 +110,10 @@ def batchify(data, batch_size, device, dtype):
     Returns the data as a numpy array of shape (nbatch, batch_size).
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    nbatch = len(data) // batch_size
+    trimmed = data[:nbatch * batch_size]
+    data = np.array(trimmed, dtype=dtype).reshape((nbatch, batch_size))
+    return data
     ### END YOUR SOLUTION
 
 
@@ -105,5 +137,10 @@ def get_batch(batches, i, bptt, device=None, dtype=None):
     target - Tensor of shape (bptt*bs,) with cached data as NDArray
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    seqlen = batches.shape[0]
+    assert i < seqlen - 1
+    end = min(seqlen, i + bptt + 1)
+    X = batches[i : end - 1, :]
+    y = batches[i + 1: end, :].flatten()
+    return Tensor(X, device=device, dtype=dtype), Tensor(y, device=device, dtype=dtype)
     ### END YOUR SOLUTION
