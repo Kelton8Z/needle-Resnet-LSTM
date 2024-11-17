@@ -103,7 +103,7 @@ class Linear(Module):
 
 
 class Flatten(Module):
-    def forward(self, X):
+    def forward(self, X: Tensor):
         ### BEGIN YOUR SOLUTION
         size = 1
         for dim in X.shape:
@@ -186,6 +186,7 @@ class BatchNorm1d(Module):
 
         # print(self.weight.shape, self.bias.shape)
         x = x.reshape((num_features, num_batches))
+
         output = self.weight.broadcast_to(x.shape) * norm.reshape((norm.shape[1], norm.shape[0])) + self.bias.broadcast_to(x.shape)
         return output
         ### END YOUR SOLUTION
