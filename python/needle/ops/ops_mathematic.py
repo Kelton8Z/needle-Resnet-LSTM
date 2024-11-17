@@ -265,8 +265,8 @@ class MatMul(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         a, b = node.inputs
-        grad_a = matmul(out_grad, array_api.transpose(b))
-        grad_b = matmul(array_api.transpose(a), out_grad)
+        grad_a = matmul(out_grad, b.transpose())
+        grad_b = matmul(a.transpose(), out_grad)
         if grad_a.shape > a.shape:
             grad_a = grad_a.sum(tuple(range(len(grad_a.shape) - len(a.shape))))
         if grad_b.shape > b.shape:
@@ -339,8 +339,7 @@ class ReLU(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         output = node.realize_cached_data()
-        output[output>0] = 1
-        return (out_grad*Tensor(output),)
+        return out_grad*Tensor(output>0, device=out_grad.device)
         ### END YOUR SOLUTION
 
 

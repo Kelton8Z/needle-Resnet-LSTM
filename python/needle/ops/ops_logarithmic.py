@@ -47,7 +47,7 @@ class LogSumExp(TensorOp):
         ### BEGIN YOUR SOLUTION
         z = node.inputs[0]
         max_z = z.realize_cached_data().max(self.axes, keepdims=True)
-        exp_z = exp(z - max_z)
+        exp_z = exp(z - max_z.broadcast_to(z.shape))
         sum_exp_z = summation(exp_z, self.axes)
         grad_sum_exp_z = out_grad / sum_exp_z
         
