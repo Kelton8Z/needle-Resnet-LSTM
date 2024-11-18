@@ -117,11 +117,12 @@ def epoch_general_cifar10(dataloader, model, loss_fn=nn.SoftmaxLoss(), opt=None)
     else:
         model.train()
         
+    dataloader.device = device
     for batch in dataloader:
         if opt:
             opt.reset_grad()
         X, y = batch
-        X, y = ndl.Tensor(X, device=device), ndl.Tensor(y, device=device)
+        # X, y = ndl.Tensor(X, device=device), ndl.Tensor(y, device=device)
         out = model(X)
         loss = loss_fn(out, y)
         if opt:
