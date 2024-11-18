@@ -20,7 +20,8 @@ class SGD(Optimizer):
         super().__init__(params)
         self.lr = lr
         self.momentum = momentum
-        self.u = {}
+        from collections import defaultdict
+        self.u = defaultdict(float)
         self.weight_decay = weight_decay
 
     def step(self):
@@ -34,8 +35,10 @@ class SGD(Optimizer):
                 self.u[param] = 0.0
                 
             self.u[param] = self.momentum * self.u[param] + (1 - self.momentum) * grad
-        
-            param.data -= self.lr * self.u[param]
+            delta = self.lr * self.u[param]
+            if param.data.shape != delta.shape:
+                delta = delta.reshape(param.data.shape)
+            param.data -= delta
         ### END YOUR SOLUTION
 
     def clip_grad_norm(self, max_norm=0.25):
